@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gambar ke Suara</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        soft: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            border: '#e2e8f0',
+                        }
+                    },
+                    borderRadius: {
+                        '3xl': '1.5rem',
+                        '4xl': '2rem'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Transisi Halus */
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(15px) scale(0.98);
+            animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Animasi Audio Visualizer (Sci-fi Style) */
+        .visualizer-container {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+            height: 60px;
+            padding: 10px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .is-processing .visualizer-container {
+            opacity: 1;
+        }
+
+        .bar {
+            width: 8px;
+            background: linear-gradient(to top, #818cf8, #6366f1);
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+            animation: bounce 0.5s infinite alternate cubic-bezier(0.6, 0.05, 0.15, 0.95);
+        }
+
+        /* Variasi kecepatan untuk tiap bar agar terlihat dinamis */
+        .bar:nth-child(1) { animation-duration: 0.4s; height: 20%; }
+        .bar:nth-child(2) { animation-duration: 0.6s; height: 50%; }
+        .bar:nth-child(3) { animation-duration: 0.5s; height: 80%; }
+        .bar:nth-child(4) { animation-duration: 0.7s; height: 40%; }
+        .bar:nth-child(5) { animation-duration: 0.3s; height: 90%; }
+        .bar:nth-child(6) { animation-duration: 0.5s; height: 60%; }
+        .bar:nth-child(7) { animation-duration: 0.6s; height: 30%; }
+
+        @keyframes bounce {
+            from { height: 10%; }
+            to { height: 100%; }
+        }
+
+        .pixelated-render {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body class="bg-soft-50 min-h-screen flex flex-col items-center justify-center p-6 font-sans text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Card Utama -->
+    <div class="bg-white max-w-md w-full rounded-4xl p-8 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.06)] fade-enter mb-6 z-10 relative">
+        
+        <div class="text-center mb-8">
+            <h2 class="text-2xl font-bold text-slate-800 tracking-tight mb-2">Visual ke Audio 🎵</h2>
+            <p class="text-sm text-slate-500 font-medium leading-relaxed">
+                Ubah matriks piksel gambarmu menjadi frekuensi gelombang suara (WAV) 16000 Hz.
+            </p>
+        </div>
+
+        <div id="upload-area" class="relative group cursor-pointer">
+            <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30" accept="image/png, image/jpeg, image/webp">
+            
+            <div id="drop-zone" class="border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50 flex flex-col items-center justify-center transition-all duration-300 group-hover:border-indigo-400 group-hover:bg-indigo-50/50 min-h-[220px] p-2 relative overflow-hidden">
+                
+                <div id="upload-placeholder" class="text-center flex flex-col items-center justify-center w-full h-full absolute inset-0 pointer-events-none transition-opacity duration-300">
+                    <div class="w-14 h-14 mb-4 rounded-2xl bg-white shadow-sm flex items-center justify-center text-indigo-500 group-hover:-translate-y-1 transition-transform duration-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-700">Klik atau Seret Gambar</span>
+                    <span class="text-xs text-slate-400 mt-1">PNG, JPG (Disarankan resolusi kecil)</span>
+                </div>
+
+                <div id="processing-container" class="w-full h-full relative rounded-2xl opacity-0 scale-95 transition-all duration-500 hidden flex-col items-center justify-center bg-indigo-50/30">
+                    <!-- Animasi Audio Visualizer -->
+                    <div class="visualizer-container">
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    </div>
+                    <p class="text-xs font-mono text-indigo-500 mt-4 animate-pulse">Encoding PCM Audio...</p>
+                </div>
+            </div>
+        </div>
+
+        <p id="change-hint" class="text-[11px] text-center text-slate-400 mt-3 hidden font-medium uppercase tracking-wider transition-opacity">
+            Klik area di atas untuk mengganti gambar
+        </p>
+
+        <!-- Hasil Output -->
+        <div id="output-area" class="mt-8 hidden flex-col items-center">
+            <div class="w-full h-[1px] bg-slate-100 mb-6"></div>
+            
+            <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4 block text-center">Hasil Konversi</label>
+            
+            <div id="result-info" class="bg-soft-100 rounded-3xl p-4 text-xs font-mono text-slate-500 w-full text-center border border-slate-200/60 shadow-inner mb-6 break-words">
+                <!-- Info sampel audio akan tampil di sini -->
+            </div>
+
+            <button id="download-btn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-4 px-6 rounded-3xl shadow-lg shadow-indigo-200 transition-all duration-300 transform active:scale-95 flex justify-center items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 18v-6a2 2 0 00-2-2H8M12 18h-4"></path>
+                </svg>
+                Unduh audio.wav
+            </button>
+        </div>
+    </div>
+
+    <div class="fade-enter text-center" style="animation-delay: 0.2s;">
+        <p class="text-[13px] font-medium text-slate-400 tracking-wide">created by yupila</p>
+    </div>
+
+    <!-- Hidden Canvas -->
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const uploadPlaceholder = document.getElementById('upload-placeholder');
+        const processingContainer = document.getElementById('processing-container');
+        const outputArea = document.getElementById('output-area');
+        const resultInfo = document.getElementById('result-info');
+        const downloadBtn = document.getElementById('download-btn');
+        const changeHint = document.getElementById('change-hint');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let audioBlobURL = null; // Menyimpan URL file WAV
+
+        // Interaksi Dropzone
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-indigo-400', 'bg-indigo-50/50'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/50'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/50');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            // Transisi UI ke Mode Animasi Processing
+            uploadPlaceholder.style.opacity = '0';
+            outputArea.classList.add('hidden');
+            outputArea.classList.remove('flex');
+            
+            setTimeout(() => {
+                uploadPlaceholder.classList.add('hidden');
+                processingContainer.classList.remove('hidden');
+                void processingContainer.offsetWidth; // Trigger reflow
+                processingContainer.classList.remove('opacity-0', 'scale-95');
+                processingContainer.classList.add('is-processing');
+            }, 300);
+
+            changeHint.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    // Gambar file ke hidden canvas untuk mengambil pikselnya
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    // Delay buatan 1.5 detik agar animasi visualizer kerennya terlihat
+                    setTimeout(() => {
+                        processImageToAudio(img.width, img.height);
+                    }, 1500);
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // --- Logika Utama: Mirroring Python Script ---
+        function processImageToAudio(width, height) {
+            const imageData = ctx.getImageData(0, 0, width, height).data;
+            let rgbPixels = [];
+
+            // 1. Ekstrak hanya RGB (Abaikan Alpha/Opacity) - sama dengan .convert("RGB") di Python
+            for (let i = 0; i < imageData.length; i += 4) {
+                rgbPixels.push(imageData[i]);     // R
+                rgbPixels.push(imageData[i+1]);   // G
+                rgbPixels.push(imageData[i+2]);   // B
+            }
+
+            // 2. Setup Key & Header
+            const key = "###";
+            const decimalKey = [];
+            for (let i = 0; i < key.length; i++) {
+                decimalKey.push(key.charCodeAt(i)); // Int16
+            }
+            const header = [width, height]; // Int16
+
+            // 3. Normalisasi & Konversi Audio PCM
+            const gain = 0.2;
+            const audioPcm = [];
+            for (let i = 0; i < rgbPixels.length; i++) {
+                let normImg = rgbPixels[i] / 255;
+                let audioFloat = (normImg * 2) - 1;
+                audioFloat = audioFloat * gain;
+                
+                // Convert float ke int16 (-32768 s/d 32767)
+                let pcmVal = Math.round(audioFloat * 32767);
+                // Clamp nilai agar tidak overflow
+                pcmVal = Math.max(-32768, Math.min(32767, pcmVal));
+                audioPcm.push(pcmVal);
+            }
+
+            // 4. Gabungkan array (concatenate)
+            const finalAudioArray = [
+                ...decimalKey,
+                ...header,
+                ...audioPcm,
+                ...decimalKey
+            ];
+
+            // 5. Generate WAV File
+            const sampleRate = 16000;
+            const wavBlob = createWavFile(finalAudioArray, sampleRate);
+            
+            // Persiapkan link unduhan
+            if (audioBlobURL) URL.revokeObjectURL(audioBlobURL);
+            audioBlobURL = URL.createObjectURL(wavBlob);
+
+            // Transisi UI selesai processing
+            processingContainer.classList.remove('is-processing');
+            processingContainer.classList.add('opacity-0', 'scale-95');
+            
+            setTimeout(() => {
+                processingContainer.classList.add('hidden');
+                uploadPlaceholder.classList.remove('hidden');
+                uploadPlaceholder.style.opacity = '1';
+                
+                resultInfo.innerHTML = `✅ Sukses!<br>Resolusi: ${width}x${height}<br>Total data audio: ${finalAudioArray.length} sampel`;
+                
+                outputArea.classList.remove('hidden');
+                outputArea.classList.add('flex');
+                
+                // Scroll sedikit ke bawah jika di layar sempit
+                outputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 500);
+        }
+
+        // --- Fungsi Helper: Membuat Header File WAV ---
+        function createWavFile(int16Array, sampleRate) {
+            const numChannels = 1; // Mono
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            const wavDataByteLength = int16Array.length * 2; // 1 int16 = 2 bytes
+            
+            // Ukuran total buffer: 44 byte WAV header + data
+            const buffer = new ArrayBuffer(44 + wavDataByteLength);
+            const view = new DataView(buffer);
+
+            function writeString(offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            // RIFF chunk descriptor
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + wavDataByteLength, true); // File size
+            writeString(8, 'WAVE');
+            
+            // fmt sub-chunk
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true); // Format data size
+            view.setUint16(20, 1, true);  // Format tag (1 = PCM)
+            view.setUint16(22, numChannels, true); // Channels
+            view.setUint32(24, sampleRate, true); // Sample rate
+            view.setUint32(28, byteRate, true); // Byte rate
+            view.setUint16(32, blockAlign, true); // Block align
+            view.setUint16(34, bitsPerSample, true); // Bits per sample
+            
+            // data sub-chunk
+            writeString(36, 'data');
+            view.setUint32(40, wavDataByteLength, true); // Data size
+            
+            // Menulis data PCM (Little-Endian)
+            let offset = 44;
+            for (let i = 0; i < int16Array.length; i++) {
+                view.setInt16(offset, int16Array[i], true);
+                offset += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (!audioBlobURL) return;
+            const link = document.createElement('a');
+            link.download = 'audio.wav';
+            link.href = audioBlobURL;
+            link.click();
+        });
+    </script>
+</body>
+</html>
