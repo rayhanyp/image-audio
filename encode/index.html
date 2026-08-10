@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dekoder Audio ke Gambar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        soft: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            border: '#e2e8f0',
+                        }
+                    },
+                    borderRadius: {
+                        '3xl': '1.5rem',
+                        '4xl': '2rem'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(15px) scale(0.98);
+            animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .pixelated-render {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        /* Gelombang Audio Animasi */
+        .wave-bar {
+            transition: height 0.1s ease;
+        }
+    </style>
+</head>
+<body class="bg-soft-50 min-h-screen flex flex-col items-center justify-center p-6 font-sans text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Card Utama -->
+    <div class="bg-white max-w-lg w-full rounded-4xl p-8 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.06)] fade-enter mb-6 z-10 relative">
+        
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-slate-800 tracking-tight mb-2">Dekoder Audio ke Gambar 📻</h2>
+            <p class="text-sm text-slate-500 font-medium leading-relaxed">
+                Unggah file `audio.wav` untuk merekonstruksi gambar secara bertahap disertai efek suara.
+            </p>
+        </div>
+
+        <!-- Upload Area -->
+        <div id="upload-area" class="relative group cursor-pointer mb-6">
+            <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30" accept=".wav">
+            <div id="drop-zone" class="border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50 flex flex-col items-center justify-center transition-all duration-300 group-hover:border-indigo-400 group-hover:bg-indigo-50/50 py-10 px-4">
+                <div class="w-14 h-14 mb-3 rounded-2xl bg-white shadow-sm flex items-center justify-center text-indigo-500 group-hover:-translate-y-1 transition-transform duration-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-slate-700">Pilih atau Seret file `audio.wav`</span>
+                <span class="text-xs text-slate-400 mt-1">Format WAV PCM 16-bit</span>
+            </div>
+        </div>
+
+        <!-- Progress & Scanning Area (Hidden by default) -->
+        <div id="scanner-section" class="hidden flex-col items-center">
+            
+            <!-- Audio Waveform Visualizer -->
+            <div class="w-full bg-slate-900 rounded-3xl p-5 mb-6 shadow-inner text-white">
+                <div class="flex justify-between items-center mb-3 text-xs font-mono text-slate-400">
+                    <span id="status-text" class="text-indigo-400 font-semibold">Memuat audio...</span>
+                    <span id="time-indicator">00:00 / 00:00</span>
+                </div>
+                <!-- Bar Visualizer -->
+                <div id="visualizer" class="flex items-end justify-between h-12 gap-1 px-1">
+                    <!-- Javascript akan mengisi bar gelombang suara secara dinamis -->
+                </div>
+            </div>
+
+            <!-- Canvas & Image Reconstruction Preview -->
+            <div class="relative p-3 bg-slate-50 rounded-3xl border border-slate-200/60 shadow-inner mb-6 flex justify-center items-center overflow-hidden min-h-[160px] w-full">
+                <canvas id="scan-canvas" class="rounded-2xl pixelated-render shadow-sm max-w-full"></canvas>
+            </div>
+
+            <!-- Informasi Detail -->
+            <div id="info-box" class="w-full text-xs font-mono text-slate-500 bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-200/50 hidden"></div>
+
+            <!-- Tombol Download -->
+            <button id="download-btn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-4 px-6 rounded-3xl shadow-lg shadow-indigo-200 transition-all duration-300 transform active:scale-95 flex justify-center items-center gap-2 hidden">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Unduh Gambar Hasil (.jpg)
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Watermark Minimalis -->
+    <div class="fade-enter text-center" style="animation-delay: 0.2s;">
+        <p class="text-[13px] font-medium text-slate-400 tracking-wide">created by yupila</p>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const uploadArea = document.getElementById('upload-area');
+        const scannerSection = document.getElementById('scanner-section');
+        const statusText = document.getElementById('status-text');
+        const timeIndicator = document.getElementById('time-indicator');
+        const visualizer = document.getElementById('visualizer');
+        const canvas = document.getElementById('scan-canvas');
+        const ctx = canvas.getContext('2d');
+        const infoBox = document.getElementById('info-box');
+        const downloadBtn = document.getElementById('download-btn');
+
+        let audioCtx = null;
+        let audioSourceNode = null;
+        let analyser = null;
+        let animationFrameId = null;
+
+        // Buat bar visualizer statis/dinamis sebanyak 32 batang
+        for(let i=0; i<32; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'flex-1 bg-indigo-500/40 rounded-full wave-bar h-2';
+            visualizer.appendChild(bar);
+        }
+        const waveBars = visualizer.querySelectorAll('.wave-bar');
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) processWavFile(file);
+        });
+
+        async function processWavFile(file) {
+            uploadArea.classList.add('hidden');
+            scannerSection.classList.remove('hidden');
+            scannerSection.classList.add('flex');
+            statusText.textContent = "Membaca data file WAV...";
+
+            const arrayBuffer = await file.arrayBuffer();
+            
+            // 1. Setup Web Audio API untuk memutar suara dan menganalisis gelombang
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioSourceNode) audioSourceNode.stop();
+
+            audioCtx.decodeAudioData(arrayBuffer, (audioBuffer) => {
+                playAudioWithEffect(audioBuffer);
+            });
+
+            // 2. Parse Data Mentah ArrayBuffer (Sesuai Skrip Python Kamu)
+            parseAudioDataManual(arrayBuffer);
+        }
+
+        function playAudioWithEffect(audioBuffer) {
+            audioSourceNode = audioCtx.createBufferSource();
+            audioSourceNode.buffer = audioBuffer;
+
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+
+            audioSourceNode.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            audioSourceNode.start(0);
+
+            const duration = audioBuffer.duration;
+            let startTime = audioCtx.currentTime;
+
+            // Update indikator waktu dan animasi visualizer gelombang suara
+            function updateVisualizer() {
+                let elapsed = audioCtx.currentTime - startTime;
+                if (elapsed >= duration) elapsed = duration;
+
+                let currentMin = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                let currentSec = Math.floor(elapsed % 60).toString().padStart(2, '0');
+                let durMin = Math.floor(duration / 60).toString().padStart(2, '0');
+                let durSec = Math.floor(duration % 60).toString().padStart(2, '0');
+
+                timeIndicator.textContent = `${currentMin}:${currentSec} / ${durMin}:${durSec}`;
+
+                // Ambil data frekuensi audio real-time untuk efek gelombang
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
+
+                waveBars.forEach((bar, index) => {
+                    let val = dataArray[index] || 10;
+                    let heightPercent = Math.max(15, (val / 255) * 100);
+                    bar.style.height = `${heightPercent}%`;
+                    bar.style.backgroundColor = val > 120 ? '#818cf8' : '#4f46e5';
+                });
+
+                if (elapsed < duration) {
+                    animationFrameId = requestAnimationFrame(updateVisualizer);
+                } else {
+                    statusText.textContent = "Dekoding & Pemutaran Selesai!";
+                }
+            }
+            updateVisualizer();
+        }
+
+        function parseAudioDataManual(arrayBuffer) {
+            const dataView = new DataView(arrayBuffer);
+            
+            // Cari posisi chunk 'data' di file WAV standar
+            let offset = 12;
+            let dataChunkOffset = -1;
+            let dataChunkSize = 0;
+
+            while (offset < dataView.byteLength) {
+                let chunkId = String.fromCharCode(
+                    dataView.getUint8(offset),
+                    dataView.getUint8(offset+1),
+                    dataView.getUint8(offset+2),
+                    dataView.getUint8(offset+3)
+                );
+                let chunkSize = dataView.getUint32(offset + 4, true);
+                if (chunkId === 'data') {
+                    dataChunkOffset = offset + 8;
+                    dataChunkSize = chunkSize;
+                    break;
+                }
+                offset = offset + 8 + chunkSize;
+            }
+
+            if (dataChunkOffset === -1) {
+                statusText.textContent = "Error: Format file WAV tidak valid!";
+                return;
+            }
+
+            // Ekstrak data PCM 16-bit (int16)
+            const numSamples = dataChunkSize / 2;
+            const audio = new Int16Array(numSamples);
+            for (let i = 0; i < numSamples; i++) {
+                audio[i] = dataView.getInt16(dataChunkOffset + (i * 2), true);
+            }
+
+            // Validasi Key ("###")
+            const key = "###";
+            let keyMatches = true;
+            for(let i=0; i<key.length; i++) {
+                if(audio[i] !== key.charCodeAt(i)) keyMatches = false;
+            }
+
+            if (!keyMatches) {
+                statusText.textContent = "Peringatan: Key awal tidak cocok!";
+                return;
+            }
+
+            // Ekstraksi Header (Width & Height)
+            const width = audio[key.length];
+            const height = audio[key.length + 1];
+
+            infoBox.classList.remove('hidden');
+            infoBox.innerHTML = `✅ Key valid terdeteksi!<br>📐 Resolusi Gambar: <b>${width} x ${height}</b> piksel`;
+
+            // Ekstraksi Data Piksel Audio
+            const totalElements = width * height * 3;
+            const startIdx = key.length + 2;
+            const audioPixelChunk = audio.subarray(startIdx, startIdx + totalElements);
+
+            // Reverse Transformation (Matematika kebalikan dari enkoding)
+            const pixels = new Uint8Array(totalElements);
+            for (let i = 0; i < totalElements; i++) {
+                let val = audioPixelChunk[i] / 32767; // Bagi 32767
+                val = val / 0.2;                      // Balikkan gain
+                val = (val + 1) / 2;                  // Balikkan skala rentang
+                pixels[i] = Math.max(0, Math.min(255, Math.round(val * 255)));
+            }
+
+            // --- ANIMASI REKONSTRUKSI GAMBAR BERTAHAP (BARIS PER BARIS) ---
+            canvas.width = width;
+            canvas.height = height;
+            const imgCtx = canvas.getContext('2d');
+            const imgData = imgCtx.createImageData(width, height);
+
+            statusText.textContent = "Melakukan scanning piksel gambar...";
+
+            let currentRow = 0;
+            const rowsPerFrame = Math.max(1, Math.floor(height / 30)); // Kecepatan scanning bertahap
+
+            function stepScan() {
+                let endRow = Math.min(height, currentRow + rowsPerFrame);
+                
+                for (let y = currentRow; y < endRow; y++) {
+                    for (let x = 0; x < width; x++) {
+                        let srcIdx = (y * width + x) * 3;
+                        let destIdx = (y * width + x) * 4;
+
+                        imgData.data[destIdx]     = pixels[srcIdx];     // R
+                        imgData.data[destIdx + 1] = pixels[srcIdx + 1]; // G
+                        imgData.data[destIdx + 2] = pixels[srcIdx + 2]; // B
+                        imgData.data[destIdx + 3] = 255;                // Alpha
+                    }
+                }
+
+                imgCtx.putImageData(imgData, 0, 0);
+                currentRow = endRow;
+
+                if (currentRow < height) {
+                    requestAnimationFrame(stepScan);
+                } else {
+                    statusText.textContent = "Rekonstruksi gambar selesai!";
+                    downloadBtn.classList.remove('hidden');
+                    downloadBtn.classList.add('flex');
+                }
+            }
+
+            // Mulai animasi scanning bertahap
+            setTimeout(stepScan, 300);
+        }
+
+        // Tombol Unduh Hasil Gambar
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'gambar_hasil_decode.jpg';
+            link.href = canvas.toDataURL('image/jpeg', 0.95);
+            link.click();
+        });
+    </script>
+</body>
+</html>
