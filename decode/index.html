@@ -205,7 +205,7 @@
             statusText.textContent = "Scanning piksel gambar...";
 
             let currentRow = 0;
-            const rowsPerFrame = Math.max(1, Math.floor(height / 2)); // Kecepatan render mulus
+            const rowsPerFrame = Math.max(1, Math.floor(height / 50)); // Kecepatan render mulus
 
             function stepScan() {
                 let endRow = Math.min(height, currentRow + rowsPerFrame);
